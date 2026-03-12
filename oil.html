@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vision Assisted Engine Oil Filling System Simulation</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #1f2937;
+      --muted: #94a3b8;
+      --line: #334155;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --accent: #e11d48;
+      --blue: #38bdf8;
+      --white: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+      color: var(--white);
+    }
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(15,23,42,0.9);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    h1 { margin: 0; font-size: 28px; }
+    .sub { color: var(--muted); margin-top: 6px; }
+    main {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
+    .panel, .sim {
+      background: rgba(17,24,39,0.92);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    }
+    .panel { padding: 18px; }
+    .sim { padding: 18px; }
+    .section-title { font-size: 15px; color: #cbd5e1; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .controls { display: grid; gap: 12px; }
+    .field {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .field label { color: #e5e7eb; font-size: 14px; }
+    .field input[type="range"] { width: 100%; grid-column: 1 / -1; }
+    .field .val { color: var(--blue); font-weight: 700; min-width: 70px; text-align: right; }
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+    button {
+      border: 0; border-radius: 12px; padding: 11px 14px; font-weight: 700; cursor: pointer;
+      color: white; background: #2563eb;
+    }
+    button.secondary { background: #475569; }
+    button.alert { background: var(--accent); }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .kpi {
+      background: #0f172a;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .kpi .label { color: var(--muted); font-size: 13px; }
+    .kpi .value { font-size: 28px; font-weight: 800; margin-top: 6px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 14px;
+    }
+    .plant {
+      background: #0b1220;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      min-height: 560px;
+      position: relative;
+      overflow: hidden;
+    }
+    .rightcol { display: grid; gap: 14px; }
+    .box {
+      background: #0b1220;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+    }
+    .station {
+      position: absolute;
+      border: 2px solid #475569;
+      border-radius: 16px;
+      padding: 10px;
+      background: rgba(30,41,59,.7);
+      text-align: center;
+      font-size: 13px;
+      min-width: 110px;
+    }
+    .station.active { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(56,189,248,.15), 0 0 24px rgba(56,189,248,.15); }
+    .station.pass { border-color: var(--good); }
+    .station.fail { border-color: var(--bad); }
+    .pipe, .wire {
+      position: absolute; background: #475569;
+      transform-origin: left top;
+    }
+    .pipe.flowing { background: var(--warn); box-shadow: 0 0 10px rgba(245,158,11,.65); }
+    .wire.live { background: var(--blue); box-shadow: 0 0 10px rgba(56,189,248,.65); }
+    .engine {
+      position: absolute;
+      left: 90px; top: 220px;
+      width: 180px; height: 110px;
+      border-radius: 20px;
+      background: linear-gradient(180deg, #6b7280, #374151);
+      border: 2px solid #cbd5e1;
+      box-shadow: inset 0 6px 14px rgba(255,255,255,.08);
+    }
+    .engine:before, .engine:after {
+      content: ""; position: absolute; width: 28px; height: 28px; border-radius: 50%; background: #111827; top: 38px;
+    }
+    .engine:before { left: 20px; }
+    .engine:after { right: 20px; }
+    .fillbar-wrap {
+      position: absolute; left: 88px; top: 345px; width: 185px;
+      background: #111827; border: 1px solid var(--line); border-radius: 12px; height: 22px; overflow: hidden;
+    }
+    .fillbar { height: 100%; width: 0%; background: linear-gradient(90deg, #f59e0b, #fde68a); transition: width .2s linear; }
+    .filltxt { position:absolute; left: 150px; top: 349px; font-size: 12px; color: #111827; font-weight: 800; }
+    .statusdot {
+      display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 8px; background: #64748b;
+    }
+    .statusdot.green { background: var(--good); }
+    .statusdot.amber { background: var(--warn); }
+    .statusdot.red { background: var(--bad); }
+    .log {
+      max-height: 200px; overflow: auto; font-family: Consolas, monospace; font-size: 12px;
+      background: #020617; padding: 10px; border-radius: 12px; border: 1px solid var(--line);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #1e293b; padding: 8px 6px; text-align: left; }
+    th { color: #cbd5e1; }
+    .tag { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+    .passTag { background: rgba(34,197,94,.12); color: #86efac; }
+    .failTag { background: rgba(239,68,68,.12); color: #fca5a5; }
+    .note { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    @media (max-width: 1100px) {
+      main { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      .kpis { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Vision Assisted Engine Oil Filling System</h1>
+    <div class="sub">Simulation of Keyence vision inspection + Siemens PLC control + VSE oil metering + Johnson gear pump filling skid</div>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <h2 class="section-title">Simulation Controls</h2>
+      <div class="controls">
+        <div class="field">
+          <label for="targetVolume">Target Oil Fill Volume</label>
+          <div class="val"><span id="targetVolumeVal">6.2</span> L</div>
+          <input id="targetVolume" type="range" min="4" max="10" step="0.1" value="6.2">
+        </div>
+        <div class="field">
+          <label for="flowRate">Pump Flow Rate</label>
+          <div class="val"><span id="flowRateVal">5.0</span> L/min</div>
+          <input id="flowRate" type="range" min="2" max="12" step="0.1" value="5.0">
+        </div>
+        <div class="field">
+          <label for="passRate">Vision Inspection Pass Probability</label>
+          <div class="val"><span id="passRateVal">92</span>%</div>
+          <input id="passRate" type="range" min="50" max="100" step="1" value="92">
+        </div>
+        <div class="field">
+          <label for="tankCap">Tank Capacity</label>
+          <div class="val"><span id="tankCapVal">50</span> L</div>
+          <input id="tankCap" type="range" min="20" max="300" step="5" value="50">
+        </div>
+        <div class="field">
+          <label for="batchCount">Auto Cycles to Run</label>
+          <div class="val"><span id="batchCountVal">5</span></div>
+          <input id="batchCount" type="range" min="1" max="20" step="1" value="5">
+        </div>
+
+        <div class="btns">
+          <button id="runOne">Run One Cycle</button>
+          <button id="runBatch" class="secondary">Run Batch</button>
+          <button id="resetBtn" class="alert">Reset</button>
+        </div>
+      </div>
+
+      <h2 class="section-title" style="margin-top:20px;">Working Principle</h2>
+      <div class="note">
+        1. Operator loads engine.<br>
+        2. Keyence camera checks MB cap sequence, bearing shell presence and grade matching.<br>
+        3. Siemens PLC permits filling only when inspection is OK.<br>
+        4. Johnson TGL gear pump transfers oil from SS tank.<br>
+        5. VSE gear flow meter sends pulse-equivalent metering feedback.<br>
+        6. PLC stops filling exactly at set volume and logs the cycle into IPC.<br>
+      </div>
+    </aside>
+
+    <section class="sim">
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Tank Inventory</div>
+          <div class="value"><span id="tankInventory">50.0</span> L</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Total Engines Processed</div>
+          <div class="value"><span id="enginesProcessed">0</span></div>
+        </div>
+        <div class="kpi">
+          <div class="label">Pass / Reject</div>
+          <div class="value"><span id="passCount">0</span> / <span id="rejectCount">0</span></div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="plant" id="plant">
+          <div class="station" id="camStation" style="left: 90px; top: 60px; width: 180px;">Keyence Vision Camera</div>
+          <div class="station" id="engineStation" style="left: 80px; top: 200px; width: 200px;">Engine Loading / Inspection Fixture</div>
+          <div class="engine"></div>
+          <div class="fillbar-wrap"><div class="fillbar" id="fillBar"></div></div>
+          <div class="filltxt" id="fillText">0.00 / 6.20 L</div>
+
+          <div class="station" id="tankStation" style="left: 420px; top: 90px; width: 160px;">SS Oil Tank</div>
+          <div class="station" id="pumpStation" style="left: 420px; top: 200px; width: 160px;">Johnson Gear Pump</div>
+          <div class="station" id="meterStation" style="left: 420px; top: 320px; width: 160px;">VSE Gear Flow Meter</div>
+          <div class="station" id="plcStation" style="left: 670px; top: 120px; width: 150px;">Siemens PLC</div>
+          <div class="station" id="ipcStation" style="left: 670px; top: 250px; width: 150px;">LattePanda IPC</div>
+          <div class="station" id="hmiStation" style="left: 670px; top: 380px; width: 150px;">11 inch HMI</div>
+          <div class="station" id="towerStation" style="left: 880px; top: 190px; width: 130px;">Tower Light</div>
+
+          <div class="pipe" id="pipe1" style="left:500px;top:130px;width:6px;height:90px"></div>
+          <div class="pipe" id="pipe2" style="left:500px;top:250px;width:6px;height:90px"></div>
+          <div class="pipe" id="pipe3" style="left:275px;top:360px;width:150px;height:6px"></div>
+          <div class="pipe" id="pipe4" style="left:420px;top:360px;width:80px;height:6px"></div>
+
+          <div class="wire" id="wire1" style="left:270px;top:110px;width:400px;height:4px"></div>
+          <div class="wire" id="wire2" style="left:500px;top:350px;width:170px;height:4px"></div>
+          <div class="wire" id="wire3" style="left:745px;top:270px;width:4px;height:110px"></div>
+          <div class="wire" id="wire4" style="left:820px;top:205px;width:60px;height:4px"></div>
+        </div>
+
+        <div class="rightcol">
+          <div class="box">
+            <h2 class="section-title">Live State</h2>
+            <div style="line-height:1.9; font-size:14px;">
+              <div><span class="statusdot" id="statusSystem"></span>System: <strong id="txtSystem">Idle</strong></div>
+              <div><span class="statusdot" id="statusVision"></span>Vision: <strong id="txtVision">Waiting</strong></div>
+              <div><span class="statusdot" id="statusFill"></span>Filling: <strong id="txtFill">Stopped</strong></div>
+              <div><span class="statusdot" id="statusTower"></span>Tower Light: <strong id="txtTower">Ready</strong></div>
+            </div>
+          </div>
+
+          <div class="box">
+            <h2 class="section-title">Latest Cycle Summary</h2>
+            <table>
+              <tbody>
+                <tr><th>Inspection Result</th><td id="resInspection">-</td></tr>
+                <tr><th>Filled Volume</th><td id="resVolume">0.00 L</td></tr>
+                <tr><th>Cycle Time</th><td id="resTime">0.0 s</td></tr>
+                <tr><th>Tank After Cycle</th><td id="resTank">50.0 L</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="box">
+            <h2 class="section-title">Event Log</h2>
+            <div class="log" id="eventLog"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const ui = {
+      targetVolume: document.getElementById('targetVolume'),
+      flowRate: document.getElementById('flowRate'),
+      passRate: document.getElementById('passRate'),
+      tankCap: document.getElementById('tankCap'),
+      batchCount: document.getElementById('batchCount'),
+      targetVolumeVal: document.getElementById('targetVolumeVal'),
+      flowRateVal: document.getElementById('flowRateVal'),
+      passRateVal: document.getElementById('passRateVal'),
+      tankCapVal: document.getElementById('tankCapVal'),
+      batchCountVal: document.getElementById('batchCountVal'),
+      runOne: document.getElementById('runOne'),
+      runBatch: document.getElementById('runBatch'),
+      resetBtn: document.getElementById('resetBtn'),
+      tankInventory: document.getElementById('tankInventory'),
+      enginesProcessed: document.getElementById('enginesProcessed'),
+      passCount: document.getElementById('passCount'),
+      rejectCount: document.getElementById('rejectCount'),
+      fillBar: document.getElementById('fillBar'),
+      fillText: document.getElementById('fillText'),
+      eventLog: document.getElementById('eventLog'),
+      txtSystem: document.getElementById('txtSystem'),
+      txtVision: document.getElementById('txtVision'),
+      txtFill: document.getElementById('txtFill'),
+      txtTower: document.getElementById('txtTower'),
+      statusSystem: document.getElementById('statusSystem'),
+      statusVision: document.getElementById('statusVision'),
+      statusFill: document.getElementById('statusFill'),
+      statusTower: document.getElementById('statusTower'),
+      resInspection: document.getElementById('resInspection'),
+      resVolume: document.getElementById('resVolume'),
+      resTime: document.getElementById('resTime'),
+      resTank: document.getElementById('resTank'),
+      camStation: document.getElementById('camStation'),
+      engineStation: document.getElementById('engineStation'),
+      tankStation: document.getElementById('tankStation'),
+      pumpStation: document.getElementById('pumpStation'),
+      meterStation: document.getElementById('meterStation'),
+      plcStation: document.getElementById('plcStation'),
+      ipcStation: document.getElementById('ipcStation'),
+      hmiStation: document.getElementById('hmiStation'),
+      towerStation: document.getElementById('towerStation'),
+      pipe1: document.getElementById('pipe1'),
+      pipe2: document.getElementById('pipe2'),
+      pipe3: document.getElementById('pipe3'),
+      pipe4: document.getElementById('pipe4'),
+      wire1: document.getElementById('wire1'),
+      wire2: document.getElementById('wire2'),
+      wire3: document.getElementById('wire3'),
+      wire4: document.getElementById('wire4'),
+    };
+
+    const state = {
+      tankInventory: 50,
+      enginesProcessed: 0,
+      passCount: 0,
+      rejectCount: 0,
+      running: false,
+      currentVolume: 0,
+    };
+
+    const fmt = (n, d=2) => Number(n).toFixed(d);
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    function syncInputs() {
+      ui.targetVolumeVal.textContent = fmt(ui.targetVolume.value,1);
+      ui.flowRateVal.textContent = fmt(ui.flowRate.value,1);
+      ui.passRateVal.textContent = ui.passRate.value;
+      ui.tankCapVal.textContent = ui.tankCap.value;
+      ui.batchCountVal.textContent = ui.batchCount.value;
+      if (!state.running) {
+        state.tankInventory = Math.min(state.tankInventory, Number(ui.tankCap.value));
+        refresh();
+      }
+      ui.fillText.textContent = `${fmt(state.currentVolume)} / ${fmt(ui.targetVolume.value)} L`;
+    }
+
+    function log(msg) {
+      const ts = new Date().toLocaleTimeString();
+      ui.eventLog.innerHTML = `[${ts}] ${msg}<br>` + ui.eventLog.innerHTML;
+    }
+
+    function clearStations() {
+      [ui.camStation, ui.engineStation, ui.tankStation, ui.pumpStation, ui.meterStation, ui.plcStation, ui.ipcStation, ui.hmiStation, ui.towerStation].forEach(el => {
+        el.classList.remove('active','pass','fail');
+      });
+      [ui.pipe1, ui.pipe2, ui.pipe3, ui.pipe4].forEach(el => el.classList.remove('flowing'));
+      [ui.wire1, ui.wire2, ui.wire3, ui.wire4].forEach(el => el.classList.remove('live'));
+    }
+
+    function setLamp(el, color) {
+      el.className = 'statusdot' + (color ? ' ' + color : '');
+    }
+
+    function refresh() {
+      ui.tankInventory.textContent = fmt(state.tankInventory,1);
+      ui.enginesProcessed.textContent = state.enginesProcessed;
+      ui.passCount.textContent = state.passCount;
+      ui.rejectCount.textContent = state.rejectCount;
+      ui.fillBar.style.width = `${(state.currentVolume / Number(ui.targetVolume.value)) * 100}%`;
+      ui.fillText.textContent = `${fmt(state.currentVolume)} / ${fmt(ui.targetVolume.value)} L`;
+    }
+
+    async function runCycle() {
+      if (state.running) return;
+      clearStations();
+      state.running = true;
+      state.currentVolume = 0;
+      refresh();
+      const target = Number(ui.targetVolume.value);
+      const flowRate = Number(ui.flowRate.value); // L/min
+      const passProb = Number(ui.passRate.value) / 100;
+      const startInventory = state.tankInventory;
+      const start = performance.now();
+
+      if (state.tankInventory < target) {
+        ui.txtSystem.textContent = 'Low Tank';
+        ui.txtTower.textContent = 'Red';
+        setLamp(ui.statusSystem,'red');
+        setLamp(ui.statusTower,'red');
+        ui.resInspection.innerHTML = '<span class="tag failTag">Tank Low</span>';
+        ui.resVolume.textContent = '0.00 L';
+        ui.resTime.textContent = '0.0 s';
+        ui.resTank.textContent = fmt(state.tankInventory,1) + ' L';
+        log('Cycle blocked: insufficient oil in tank.');
+        state.running = false;
+        return;
+      }
+
+      ui.txtSystem.textContent = 'Inspection Running';
+      ui.txtVision.textContent = 'Checking';
+      ui.txtFill.textContent = 'Stopped';
+      ui.txtTower.textContent = 'Amber';
+      setLamp(ui.statusSystem,'amber');
+      setLamp(ui.statusVision,'amber');
+      setLamp(ui.statusFill,'');
+      setLamp(ui.statusTower,'amber');
+      ui.camStation.classList.add('active');
+      ui.engineStation.classList.add('active');
+      ui.plcStation.classList.add('active');
+      ui.hmiStation.classList.add('active');
+      ui.wire1.classList.add('live');
+      log('Engine loaded in fixture. Vision inspection started.');
+      await sleep(1200);
+
+      const visionPass = Math.random() < passProb;
+      if (!visionPass) {
+        ui.camStation.classList.add('fail');
+        ui.engineStation.classList.add('fail');
+        ui.txtVision.textContent = 'FAIL';
+        ui.txtSystem.textContent = 'Reject';
+        ui.txtTower.textContent = 'Red';
+        setLamp(ui.statusSystem,'red');
+        setLamp(ui.statusVision,'red');
+        setLamp(ui.statusTower,'red');
+        state.enginesProcessed += 1;
+        state.rejectCount += 1;
+        ui.resInspection.innerHTML = '<span class="tag failTag">Rejected</span>';
+        ui.resVolume.textContent = '0.00 L';
+        ui.resTime.textContent = (((performance.now()-start)/1000)).toFixed(1) + ' s';
+        ui.resTank.textContent = fmt(state.tankInventory,1) + ' L';
+        refresh();
+        log('Vision rejected engine. PLC inhibited oil filling.');
+        await sleep(700);
+        state.running = false;
+        return;
+      }
+
+      ui.camStation.classList.add('pass');
+      ui.engineStation.classList.add('pass');
+      ui.txtVision.textContent = 'PASS';
+      setLamp(ui.statusVision,'green');
+      log('Vision inspection passed. PLC enabled filling sequence.');
+      await sleep(700);
+
+      ui.txtSystem.textContent = 'Filling';
+      ui.txtFill.textContent = 'Running';
+      ui.txtTower.textContent = 'Amber';
+      setLamp(ui.statusSystem,'amber');
+      setLamp(ui.statusFill,'amber');
+      setLamp(ui.statusTower,'amber');
+      [ui.tankStation, ui.pumpStation, ui.meterStation, ui.plcStation, ui.ipcStation].forEach(el => el.classList.add('active'));
+      [ui.pipe1, ui.pipe2, ui.pipe3, ui.pipe4].forEach(el => el.classList.add('flowing'));
+      [ui.wire2, ui.wire3, ui.wire4].forEach(el => el.classList.add('live'));
+      log('Johnson gear pump started. VSE meter feedback active.');
+
+      const fillPerTick = flowRate / 60 / 5; // 200 ms tick
+      while (state.currentVolume < target - 1e-6) {
+        await sleep(200);
+        const add = Math.min(fillPerTick, target - state.currentVolume);
+        state.currentVolume += add;
+        state.tankInventory -= add;
+        refresh();
+      }
+
+      ui.txtFill.textContent = 'Stopped';
+      ui.txtSystem.textContent = 'Cycle Complete';
+      ui.txtTower.textContent = 'Green';
+      setLamp(ui.statusSystem,'green');
+      setLamp(ui.statusFill,'green');
+      setLamp(ui.statusTower,'green');
+      state.enginesProcessed += 1;
+      state.passCount += 1;
+      const cycleTime = (performance.now() - start) / 1000;
+      ui.resInspection.innerHTML = '<span class="tag passTag">Accepted</span>';
+      ui.resVolume.textContent = fmt(state.currentVolume) + ' L';
+      ui.resTime.textContent = fmt(cycleTime,1) + ' s';
+      ui.resTank.textContent = fmt(state.tankInventory,1) + ' L';
+      refresh();
+      log(`Oil filled successfully: ${fmt(state.currentVolume)} L. Cycle logged into LattePanda IPC.`);
+      await sleep(900);
+      state.currentVolume = 0;
+      refresh();
+      clearStations();
+      state.running = false;
+    }
+
+    async function runBatch() {
+      if (state.running) return;
+      const n = Number(ui.batchCount.value);
+      for (let i = 0; i < n; i++) {
+        await runCycle();
+        if (state.running) break;
+        await sleep(500);
+      }
+    }
+
+    function resetAll() {
+      state.tankInventory = Number(ui.tankCap.value);
+      state.enginesProcessed = 0;
+      state.passCount = 0;
+      state.rejectCount = 0;
+      state.currentVolume = 0;
+      clearStations();
+      ui.eventLog.innerHTML = '';
+      ui.txtSystem.textContent = 'Idle';
+      ui.txtVision.textContent = 'Waiting';
+      ui.txtFill.textContent = 'Stopped';
+      ui.txtTower.textContent = 'Ready';
+      setLamp(ui.statusSystem,'');
+      setLamp(ui.statusVision,'');
+      setLamp(ui.statusFill,'');
+      setLamp(ui.statusTower,'green');
+      ui.resInspection.textContent = '-';
+      ui.resVolume.textContent = '0.00 L';
+      ui.resTime.textContent = '0.0 s';
+      ui.resTank.textContent = fmt(state.tankInventory,1) + ' L';
+      refresh();
+      log('Simulation reset and ready.');
+    }
+
+    [ui.targetVolume, ui.flowRate, ui.passRate, ui.tankCap, ui.batchCount].forEach(el => el.addEventListener('input', syncInputs));
+    ui.runOne.addEventListener('click', runCycle);
+    ui.runBatch.addEventListener('click', runBatch);
+    ui.resetBtn.addEventListener('click', resetAll);
+
+    syncInputs();
+    resetAll();
+  </script>
+</body>
+</html>
